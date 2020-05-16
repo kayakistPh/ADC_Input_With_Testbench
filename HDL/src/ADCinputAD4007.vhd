@@ -158,7 +158,7 @@ begin
             dataShift <= (others => '0');
             data_counter <= "10010";
         elsif(falling_edge(clk100m_i)) then
-            if (fsmStates = data_read) then
+            if (fsmStates = data_read or fsmStates = setup_sclk2) then
                 dataShift(17 downto 1) <= dataShift(16 downto 0);
                 dataShift(0) <= sdo_i;
                 data_counter <= std_ulogic_vector(unsigned(data_counter) - 1);
@@ -253,4 +253,5 @@ begin
     end process;
 
     sck_o <= clk100m_i when enable_sclk = '1' else force_sclk_high;
+    sdi_o <= '1';
 end ARCHITECTURE;
