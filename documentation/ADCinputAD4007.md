@@ -7,8 +7,11 @@ sample rate between 2MHz and 0.5MHz is provided.
 
 ![Datasheet timing diagram](./ImageSource/DataFormat.PNG)
 
+Image taken from Ad4007 datasheet to show timing.
+
 The timing is driven by an FSM:
-![ADC FSM](./ImageSource/ADCfsm.PNG)
+
+![ADC FSM](./ImageSource/ADCfsm.png)
 
 ## Doxygen
 The code is written to generate a useful doxygen output including graphs for the FSMs.
@@ -25,7 +28,7 @@ signal is high. dataValid is set low when the dataRead_i is high.
 
 This is driven by the FSM.
 
-![Data out FSM](./ImageSource/DataOutFSM.PNG)
+![Data out FSM](./ImageSource/DataOutFSM.png)
 
 
 ## Sample Rates
@@ -89,13 +92,14 @@ coverage bins to ensure good coverage of the edge conditions.
 The results are then listed in an OSVVM scoreboard.
 
 ### Running simulations
-The simulations can be run in GHDL and also Active-HDL. Both require OSVVM.
+The simulation can be run (i.e. have been tested in) in GHDL and Active-HDL. Both require OSVVM.
 
 
 ### Simulation Output
 The timing can be verified against the part data sheet using the waveform viewer:
 
 ![Latched data out](./ImageSource/DataCorrect.PNG)
+
 
 The *OSVVM* output can also be checked from the file *./AD4007_data_test.txt*:
 
