@@ -7,7 +7,17 @@
 
 library ieee;
 use ieee.NUMERIC_STD.all;
-use ieee.STD_LOGIC_1164.all;
+use ieee.STD_LOGIC_1164.all;	
+
+--Include OSVVM libs
+library osvvm;
+use osvvm.OsvvmGlobalPkg.all;
+use osvvm.AlertLogPkg.all;
+use osvvm.RandomPkg.all;
+use osvvm.CoveragePkg.all;
+use osvvm.TranscriptPkg.all;
+
+
 
 ENTITY tb_ADCinputAD4007 IS
 END tb_ADCinputAD4007;
@@ -67,7 +77,9 @@ signal samples_tested : std_ulogic_vector(4 downto 0):= "00000";
 signal LatchedDataIn : std_ulogic_vector(17 downto 0);
 signal LatchedDataOut : std_ulogic_vector(17 downto 0);
 signal checkDataPoint:std_ulogic; --Logic function so no init
-signal dataCorrect :std_ulogic :='0';
+signal dataCorrect :std_ulogic :='0'; 
+
+shared variable adc_data: CovPType;
 
 begin
     -- Attach the components
@@ -122,31 +134,9 @@ begin
          end if;
      end process;
 
-
-    --! Generates a new value to be loaded into the ADC
-    --! Initaly does debug vaules 0,1,A's etc. then generates random patterns
-    loadNewdata: process(cnv,tbData)
-    begin
-        if(falling_edge(cnv)) then
-            samples_tested <= std_ulogic_vector(unsigned(samples_tested) + 1);
-            LatchedDataIn <= tbData;
-            if (samples_tested = "00000") then
-                tbData <= "000000000000000000";
-            elsif (samples_tested = "00001") then
-                tbData <= "111111111111111111";
-            elsif (samples_tested = "00010") then
-                tbData <= "101010101010101010";
-            elsif (samples_tested = "00011") then
-                tbData <= "101011110000110011";
-            elsif (samples_tested = "00100") then
-                tbData <= "101010010011001101";
-            else
-                tbData <= "000000001111000000";
-            end if;
-        end if;
-    end process;
-
-    checkData:process(checkDataPoint)
+     --! Performs the check on the data input to the test and data receieved from it
+	 --! Raises an error if there is a differance. 
+	 checkData:process(checkDataPoint)
     begin
         if rising_edge(checkDataPoint) then
             if (LatchedDataIn = LatchedDataOut) then
@@ -154,19 +144,94 @@ begin
             else
                 dataCorrect <= '0';
             end if;
+			AlertIfNotEqual(LatchedDataIn, LatchedDataOut, "Missmatch in data input to testbench and data receieved", ERROR);
         end if;
     end process;
 
     --! Main testbench controlling process
     tb : process
+	variable RandDat : RandomPType;
     begin
+		--Setup OSVVM
+		SetGlobalAlertEnable(TRUE);
+		SetAlertStopCount(ERROR,10);
+		SetLogEnable(INFO,TRUE);
+		RandDat.InitSeed(RandDat'instance_name); 
+		-- Set up the coverage bins
+		-- First Bin is within 20 of 0
+		adc_data.AddBins(Name => "ADC close to 0 posative",
+		CovBin => GenBin(0,20,1),
+		AtLeast => 1);		   
+		-- Witin 20 of 0 negative side ADC is twos complement
+		adc_data.AddBins(Name => "ADC close to 0 negative",
+		CovBin => GenBin(262123,262143,1),
+		AtLeast => 1);
+		-- Most posative
+		adc_data.AddBins(Name => "ADC posative",
+		CovBin => GenBin(131052,131071,1),
+		AtLeast => 1);
+		-- Most negative
+		adc_data.AddBins(Name => "ADC negative",
+		CovBin => GenBin(131073,131094,1),
+		AtLeast => 1);
+		
+		
         --hold in reset for 30ns
         reset_n <= '0';
         wait for 10 ns;
         reset_n <= '1';
+		Log("System in reset", INFO);
         wait for 30 ns;
         reset_n <= '0';
-        wait for 100 ms;
+		Log("Out of reset ---TEST BEGINS", INFO); 
+				
+		wait on cnv until cnv = '0';
+		samples_tested <= std_ulogic_vector(unsigned(samples_tested) + 1);
+        LatchedDataIn <= tbData;
+        tbData <= "000000000000000000";
+		Log("Testing all 0s", INFO);
+		
+		wait on cnv until cnv = '0';
+		samples_tested <= std_ulogic_vector(unsigned(samples_tested) + 1);
+        LatchedDataIn <= tbData;
+        tbData <= "000000000000000000";
+		Log("Testing all 0s", INFO);
+		
+		wait on cnv until cnv = '0';
+		samples_tested <= std_ulogic_vector(unsigned(samples_tested) + 1);
+        LatchedDataIn <= tbData;
+        tbData <= "111111111111111111";
+		Log("Testing all 1s", INFO);
+		
+		wait on cnv until cnv = '0';
+		samples_tested <= std_ulogic_vector(unsigned(samples_tested) + 1);
+        LatchedDataIn <= tbData;
+        tbData <= "101010101010101010";
+		Log("Testing all As", INFO);
+		
+		wait on cnv until cnv = '0';
+		samples_tested <= std_ulogic_vector(unsigned(samples_tested) + 1);
+        LatchedDataIn <= tbData;
+        tbData <= "101011110000110011";
+		Log("Testing direction pattern", INFO);
+		
+		Log("Bit patterns tested begin random tests", INFO);
+			
+		loop 
+			  wait on cnv until cnv = '0';
+			  samples_tested <= std_ulogic_vector(unsigned(samples_tested) + 1);
+        	  LatchedDataIn <= tbData;
+        	  tbData <= RandDat.Randslv(0,262143,18);
+			  --Store the cover
+			  adc_data.ICover(to_integer(unsigned(tbData)));
+			  adc_data.WriteBin;
+			  exit when adc_data.IsCovered;
+		end loop;
+		Log("Reached end of test", INFO);
+		ReportAlerts("AD4007 test");
+		adc_data.FileOpenWriteBin("./AD4007_data_test.txt", WRITE_MODE);
+		TranscriptClose;
+		Alert("End of Test", FAILURE); --Force the end of the test		
     end process;
 
     checkDataPoint <= dataReady and dataRead;
