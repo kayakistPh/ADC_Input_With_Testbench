@@ -7,7 +7,7 @@
 
 library ieee;
 use ieee.NUMERIC_STD.all;
-use ieee.STD_LOGIC_1164.all;	
+use ieee.STD_LOGIC_1164.all;
 
 --Include OSVVM libs
 library osvvm;
@@ -62,7 +62,7 @@ end component AD4007;
 
 signal clock: std_logic;
 signal reset_n: std_logic;
-signal sclk, sdo, cnv, sdi: std_logic; --Tracks to ADC
+signal sclk, sdo, cnv, sdi, sdo_d: std_logic; --Tracks to ADC
 --Connections to rest of ADC
 signal sampleRate: std_ulogic_vector(4 downto 0) := "00000";
 signal data: std_ulogic_vector(17 downto 0):= "101011110000110011";
@@ -77,7 +77,7 @@ signal samples_tested : std_ulogic_vector(4 downto 0):= "00000";
 signal LatchedDataIn : std_ulogic_vector(17 downto 0);
 signal LatchedDataOut : std_ulogic_vector(17 downto 0);
 signal checkDataPoint:std_ulogic; --Logic function so no init
-signal dataCorrect :std_ulogic :='0'; 
+signal dataCorrect :std_ulogic :='0';
 
 shared variable adc_data: CovPType;
 
@@ -102,7 +102,7 @@ begin
         sck_o => sclk,
         cnv_o => cnv,
         sdi_o => sdi,
-        sdo_i => sdo,
+        sdo_i => sdo_d,
 
         --Interface to rest of FPGA
         data_o => data,
@@ -135,7 +135,7 @@ begin
      end process;
 
      --! Performs the check on the data input to the test and data receieved from it
-	 --! Raises an error if there is a differance. 
+	 --! Raises an error if there is a differance.
 	 checkData:process(checkDataPoint)
     begin
         if rising_edge(checkDataPoint) then
@@ -156,12 +156,12 @@ begin
 		SetGlobalAlertEnable(TRUE);
 		SetAlertStopCount(ERROR,10);
 		SetLogEnable(INFO,TRUE);
-		RandDat.InitSeed(RandDat'instance_name); 
+		RandDat.InitSeed(RandDat'instance_name);
 		-- Set up the coverage bins
 		-- First Bin is within 20 of 0
 		adc_data.AddBins(Name => "ADC close to 0 posative",
 		CovBin => GenBin(0,20,1),
-		AtLeast => 1);		   
+		AtLeast => 1);
 		-- Witin 20 of 0 negative side ADC is twos complement
 		adc_data.AddBins(Name => "ADC close to 0 negative",
 		CovBin => GenBin(262123,262143,1),
@@ -174,8 +174,8 @@ begin
 		adc_data.AddBins(Name => "ADC negative",
 		CovBin => GenBin(131073,131094,1),
 		AtLeast => 1);
-		
-		
+
+
         --hold in reset for 30ns
         reset_n <= '0';
         wait for 10 ns;
@@ -183,41 +183,41 @@ begin
 		Log("System in reset", INFO);
         wait for 30 ns;
         reset_n <= '0';
-		Log("Out of reset ---TEST BEGINS", INFO); 
-				
+		Log("Out of reset ---TEST BEGINS", INFO);
+
 		wait on cnv until cnv = '0';
 		samples_tested <= std_ulogic_vector(unsigned(samples_tested) + 1);
         LatchedDataIn <= tbData;
         tbData <= "000000000000000000";
 		Log("Testing all 0s", INFO);
-		
+
 		wait on cnv until cnv = '0';
 		samples_tested <= std_ulogic_vector(unsigned(samples_tested) + 1);
         LatchedDataIn <= tbData;
         tbData <= "000000000000000000";
 		Log("Testing all 0s", INFO);
-		
+
 		wait on cnv until cnv = '0';
 		samples_tested <= std_ulogic_vector(unsigned(samples_tested) + 1);
         LatchedDataIn <= tbData;
         tbData <= "111111111111111111";
 		Log("Testing all 1s", INFO);
-		
+
 		wait on cnv until cnv = '0';
 		samples_tested <= std_ulogic_vector(unsigned(samples_tested) + 1);
         LatchedDataIn <= tbData;
         tbData <= "101010101010101010";
 		Log("Testing all As", INFO);
-		
+
 		wait on cnv until cnv = '0';
 		samples_tested <= std_ulogic_vector(unsigned(samples_tested) + 1);
         LatchedDataIn <= tbData;
         tbData <= "101011110000110011";
 		Log("Testing direction pattern", INFO);
-		
+
 		Log("Bit patterns tested begin random tests", INFO);
-			
-		loop 
+
+		loop
 			  wait on cnv until cnv = '0';
 			  samples_tested <= std_ulogic_vector(unsigned(samples_tested) + 1);
         	  LatchedDataIn <= tbData;
@@ -229,10 +229,11 @@ begin
 		end loop;
 		Log("Reached end of test", INFO);
 		ReportAlerts("AD4007 test");
-		adc_data.FileOpenWriteBin("./AD4007_data_test.txt", WRITE_MODE);
+		adc_data.FileOpenWriteBin("./AD4007_data_test.txt", WRITE_MODE);--"./AD4007_data_test.txt", WRITE_MODE);
 		TranscriptClose;
-		Alert("End of Test", FAILURE); --Force the end of the test		
+		Alert("End of Test", FAILURE); --Force the end of the test
     end process;
 
     checkDataPoint <= dataReady and dataRead;
+	sdo_d <= transport sdo after 3ns;  --Include the propergation of a buffer
 end ARCHITECTURE;
