@@ -27,7 +27,7 @@ signal nextState: states := data_ready;
 signal ad4007InternalClk:std_ulogic :='0';
 
 --Internal signals for ADC
-signal counter : std_ulogic_vector(4 downto 0) := (others => '1');
+signal counter : std_ulogic_vector(4 downto 0) := "11110";
 signal dataOutputEN : std_ulogic := '0';
 --Forced the data to 'z' to reflect the way the ADC actualy behaves
 signal data : std_ulogic_vector(17 downto 0) := (others => 'Z');
@@ -61,22 +61,23 @@ begin
         case fsmStates is
             when cnv_start =>
                 data <= tbData_i;
-                dataOutputEN <= '0';
                 nextState <= cnv_load;
             when cnv_load =>
                 data_d <= data;
+                dataOutputEN <= '0';
                 nextState <= cnv_wait;
             when cnv_wait =>
                 if (counter = "00000") then
+                    dataOutputEN <= '1';
                     nextState <= data_ready;
                 else
                     nextState <= cnv_wait;
                 end if;
             when data_ready =>
                 if (cnv_i = '1') then
-                    nextState <= data_ready;
-                else
                     nextState <= cnv_start;
+                else
+                    nextState <= data_ready;
                 end if;
         end case;
     end process;
@@ -98,7 +99,7 @@ begin
     begin
         if(rising_edge(ad4007InternalClk)) then
             if(fsmStates = cnv_load) then
-                counter <= (others => '1');
+                counter <= ("11110");
             elsif(fsmStates = cnv_wait) then
                 counter <= std_ulogic_vector(unsigned(counter) - 1);
             else
@@ -115,10 +116,11 @@ begin
             dataShift <= data_d;
             sdo_o <= 'Z';
         elsif(rising_edge(sck_i)) then
-            sdo_o <= dataShift(0);
-            dataShift(16 downto 0) <= dataShift(17 downto 1);
-            dataShift(17) <= 'Z'; --Replecates the device
+            sdo_o <= dataShift(17);
+            dataShift(17 downto 1) <= dataShift(16 downto 0);
+            dataShift(0) <= 'Z'; --Replecates the device
         else
+            sdo_o <= dataShift(17);
             dataShift <= dataShift;
         end if;
     end process;
