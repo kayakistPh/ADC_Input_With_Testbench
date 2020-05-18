@@ -35,7 +35,7 @@ ARCHITECTURE rtl of ADCinputAD4007 IS
 -- FSM states
 type states is (start_sample, cnv_wait, setup_sclk, setup_sclk2,data_read, delay0, delay1, delay2, delay3);
 signal fsmStates: states := start_sample;
-signal nextState: states := start_sample;
+signal dataRead_d,dataRead_dd: states := start_sample;
 
 type dataOutputStates is (outputData,dataReady,waitDataRead,dataRead,waitNextSample,waitNewData);
 signal fsmStatesDout: dataOutputStates := waitNewData;
@@ -44,6 +44,8 @@ signal nextStateDout: dataOutputStates := waitNewData;
 
 signal enable_sclk : std_ulogic := '0';
 signal force_sclk_high : std_ulogic := '0';
+signal enable_sclk : std_ulogic := '0';
+
 signal cnv_counter : std_ulogic_vector(4 downto 0) := (others => '1');
 signal samp_counter : std_ulogic_vector(4 downto 0) := (others => '0');
 signal data_counter : std_ulogic_vector(4 downto 0) := (others => '0');
@@ -201,7 +203,7 @@ begin
     --! }
     --! \enddot
     --! @vhdlflow
-    outputDataProcess: process(fsmStatesDout, dataRead_i, fsmStates, data_counter)
+    outputDataProcess: process(fsmStatesDout, dataRead_dd, fsmStates, data_counter)
     begin
         if (reset_n_i = '1') then
             data_o <= (others => '0');
@@ -215,7 +217,7 @@ begin
                     dataReady_o <= '1';
                     nextStateDout <= waitDataRead;
                 when waitDataRead =>
-                    if (dataRead_i = '1') then
+                    if (dataRead_dd = '1') then
                         nextStateDout <= dataRead;
                     else
                         nextStateDout <= waitDataRead;
@@ -252,6 +254,14 @@ begin
         end if;
     end process;
 
+    bufferDataReady:process(clk100m_i)
+    begin
+        if(rising_edge(clk100m_i))the
+            dataRead_dd <= dataRead_d;
+            dataRead_d <= dataRead_i;
+        end if;
+    end process;
+    
     sck_o <= clk100m_i when enable_sclk = '1' else force_sclk_high;
     sdi_o <= '1';
 end ARCHITECTURE;
